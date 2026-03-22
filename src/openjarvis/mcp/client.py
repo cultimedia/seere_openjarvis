@@ -49,7 +49,15 @@ class MCPClient:
 
         Returns the server capabilities.
         """
-        response = self._send("initialize")
+        params = {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {
+                "name": "openjarvis",
+                "version": "0.1.0"
+            }
+        }
+        response = self._send("initialize", params)
         self._initialized = True
         self._capabilities = response.result.get("capabilities", {})
         return response.result
