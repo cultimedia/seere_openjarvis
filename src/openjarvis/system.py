@@ -768,7 +768,7 @@ class SystemBuilder:
         else:
             tools = []
 
-        # 5. Discover external MCP server tools
+        # 5. Discover external MCP server tools (not filtered by tool_names)
         if config.tools.mcp.servers:
             try:
                 import json
@@ -777,11 +777,7 @@ class SystemBuilder:
                     for server_cfg in server_list:
                         try:
                             external_tools = self._discover_external_mcp(server_cfg)
-                            if tool_names:
-                                external_tools = [
-                                    t for t in external_tools
-                                    if t.spec.name in tool_names
-                                ]
+                            # External MCP tools are always included when configured
                             tools.extend(external_tools)
                         except Exception as exc:
                             logger.warning(
@@ -959,7 +955,12 @@ class SystemBuilder:
         args = cfg.get("args", [])
         if not command:
             return []
-        transport = StdioTransport(command=command, args=args)
+        # Combine command and args into a single list for StdioTransport
+        if isinstance(command, str):
+            cmd_list = [command] + (args if isinstance(args, list) else [])
+        else:
+            cmd_list = command if isinstance(command, list) else [command]
+        transport = StdioTransport(command=cmd_list)
         client = MCPClient(transport)
         provider = MCPToolProvider(client)
         return provider.discover()
