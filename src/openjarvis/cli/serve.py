@@ -205,6 +205,16 @@ def serve(
                 if getattr(agent_cls, "accepts_tools", False):
                     agent_kwargs["max_turns"] = config.agent.max_turns
 
+                # Inject Seere system prompt for orchestrator agent
+                if agent_key == "orchestrator":
+                    from openjarvis.learning.intelligence.orchestrator.prompt_registry import (
+                        build_system_prompt,
+                    )
+                    agent_kwargs["system_prompt"] = build_system_prompt(
+                        tools=agent_kwargs.get("tools")
+                    )
+                    console.print("🏇 [bold yellow]Seere identity activated[/bold yellow]")
+
                 agent = agent_cls(engine, model_name, **agent_kwargs)
         except Exception as exc:
             import traceback

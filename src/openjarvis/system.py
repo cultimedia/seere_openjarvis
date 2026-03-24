@@ -147,7 +147,17 @@ class JarvisSystem:
         if getattr(agent_cls, "accepts_tools", False):
             agent_kwargs["tools"] = agent_tools
             agent_kwargs["max_turns"] = self.config.agent.max_turns
-        if system_prompt is not None:
+        # Always inject Seere system prompt for orchestrator agent
+        if agent_name == "orchestrator" and system_prompt is None:
+            from openjarvis.learning.intelligence.orchestrator.prompt_registry import (
+                build_system_prompt,
+            )
+            seere_prompt = build_system_prompt(tools=agent_tools)
+            import logging
+            logging.getLogger("openjarvis.system").info(f"🏇 Built Seere prompt: {len(seere_prompt)} chars")
+            logging.getLogger("openjarvis.system").info(f"🏇 Preview: {seere_prompt[:100]}...")
+            agent_kwargs["system_prompt"] = seere_prompt
+        elif system_prompt is not None:
             agent_kwargs["system_prompt"] = system_prompt
         if self.capability_policy is not None:
             agent_kwargs["capability_policy"] = self.capability_policy

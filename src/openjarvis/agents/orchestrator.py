@@ -212,8 +212,13 @@ class OrchestratorAgent(ToolUsingAgent):
     ) -> AgentResult:
         self._emit_turn_start(input)
 
-        # Build initial messages
-        messages = self._build_messages(input, context)
+        # Build initial messages with system prompt
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🏇 Seere system prompt active: {bool(self._system_prompt)}")
+        if self._system_prompt:
+            logger.info(f"🏇 Prompt preview: {self._system_prompt[:100]}...")
+        messages = self._build_messages(input, context, system_prompt=self._system_prompt)
 
         # Get OpenAI-format tool definitions
         openai_tools = self._executor.get_openai_tools() if self._tools else []

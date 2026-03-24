@@ -94,6 +94,25 @@ async def chat_completions(request_body: ChatCompletionRequest, request: Request
                 "Memory context injection failed", exc_info=True,
             )
 
+    # Inject Seere system prompt for orchestrator agent
+    logger = logging.getLogger("openjarvis.server")
+    logger.info(f"🔍 Debug: agent={agent}, has_attr={hasattr(agent, '_system_prompt') if agent else False}")
+    if agent is not None and hasattr(agent, '_system_prompt'):
+        logger.info(f"🔍 System prompt length: {len(agent._system_prompt) if agent._system_prompt else 0}")
+        if agent._system_prompt:
+            from openjarvis.server.models import ChatMessage
+            # Prepend system prompt if not already present
+            if not request_body.messages or request_body.messages[0].role != "system":
+                seere_msg = ChatMessage(role="system", content=agent._system_prompt)
+                request_body.messages.insert(0, seere_msg)
+                logger.info(f"🏇 Injected Seere system prompt ({len(agent._system_prompt)} chars)")
+            else:
+                logger.info("⚠️ System message already present, not injecting")
+        else:
+            logger.warning("⚠️ Agent has _system_prompt attribute but it's empty!")
+    else:
+        logger.warning(f"⚠️ Cannot inject: agent={'None' if agent is None else 'exists'}, has_prompt={hasattr(agent, '_system_prompt') if agent else 'N/A'}")
+
     if request_body.stream:
         bus = getattr(request.app.state, "bus", None)
         # Use the agent stream bridge only when tools are present (the
