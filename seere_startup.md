@@ -130,6 +130,83 @@ lsof -i :5173  # Frontend
 kill -9 <PID>
 ```
 
+### Tools not executing (Seere narrates instead)
+
+**Symptom:** Seere says "I would use the web_search tool..." but doesn't actually execute it.
+
+**Cause:** Orchestrator mode mismatch in config.
+
+**Fix:**
+```bash
+# Check your config
+grep "mode" ~/.openjarvis/config.toml
+
+# Should show:
+# [orchestrator]
+# mode = "function_calling"
+
+# If it says "structured", change it to "function_calling"
+# Then restart Terminal 2
+```
+
+---
+
+## Memory Backend Setup (Optional)
+
+If you want Seere to remember information across sessions and search a knowledge base:
+
+### 1. Build Rust Extension
+
+```bash
+cd ~/OpenJarvis/rust/crates/openjarvis-python
+../../../.venv/bin/maturin develop
+```
+
+### 2. Configure Memory
+
+Add to `~/.openjarvis/config.toml`:
+```toml
+[agent]
+context_from_memory = true
+
+[memory]
+default_backend = "sqlite"
+db_path = "~/.openjarvis/memory.db"
+```
+
+Update tools list:
+```toml
+[agent]
+tools = "think,calculator,web_search,web_fetch,news_search,memory_search,memory_retrieve"
+```
+
+### 3. Index Your Knowledge Base
+
+```bash
+# Create a folder for your KB documents
+mkdir -p ~/OpenJarvis/seere_kb
+
+# Add markdown files to the folder, then:
+.venv/bin/jarvis memory index ~/OpenJarvis/seere_kb/
+```
+
+### 4. Restart Backend (Terminal 2)
+
+```bash
+pkill -f "jarvis serve"
+.venv/bin/jarvis serve --port 8000 &
+```
+
+**Verify:** Backend logs should show "Memory: active"
+
+### Test Memory
+
+```bash
+.venv/bin/jarvis memory search "your query"
+```
+
+Now Seere can automatically search your knowledge base when you ask questions!
+
 ---
 
 ## Notes
