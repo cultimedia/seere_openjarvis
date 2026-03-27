@@ -1,0 +1,169 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1000"
+  height="1000"
+  viewBox="0 0 1000 1000"
+>
+  <!-- STYLE -->
+  <defs>
+    <style>
+      .sigil-stroke {
+        fill: none;
+        stroke: #00c4b8;
+        stroke-width: 18;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+
+  <!-- OUTER CIRCLE: center (0.5,0.5), r = 0.472 -->
+  <circle
+    class="sigil-stroke"
+    cx="500"
+    cy="500"
+    r="472"
+  />
+
+  <!-- INNER CIRCLE: diameter 0.583 -> r ≈ 0.2915 -->
+  <circle
+    class="sigil-stroke"
+    cx="500"
+    cy="500"
+    r="291.5"
+  />
+
+  <!-- VERTICAL AXIS (full axis inside outer circle)
+       from y ≈ 0.099 to y ≈ 0.901 -->
+  <line
+    class="sigil-stroke"
+    x1="500"
+    y1="99"
+    x2="500"
+    y2="901"
+  />
+
+  <!-- DIAGONAL TRAJECTORY
+       Start ~ (0.261, 0.739) -> (261,739)
+       End   ~ (0.830, 0.170) -> (830,170) -->
+  <line
+    class="sigil-stroke"
+    x1="261"
+    y1="739"
+    x2="830"
+    y2="170"
+  />
+
+  <!-- CENTRAL BODY BAR (horse body)
+       width ≈ 0.085 -> 85 units
+       from x ≈ 0.4575 to 0.5425 -> 457.5 to 542.5 at y=500 -->
+  <line
+    class="sigil-stroke"
+    x1="457.5"
+    y1="500"
+    x2="542.5"
+    y2="500"
+  />
+
+  <!-- WINGS (quadratic curves) -->
+
+  <!-- Left wing:
+       start: (0.458, 0.5)  -> (458,500)
+       control: (0.430,0.455)-> (430,455)
+       end: (0.410, 0.470) -> (410,470)
+  -->
+  <path
+    class="sigil-stroke"
+    d="M 458 500 Q 430 455 410 470"
+  />
+
+  <!-- Right wing:
+       start: (0.542, 0.5)  -> (542,500)
+       control: (0.570,0.455)-> (570,455)
+       end: (0.590,0.470) -> (590,470)
+  -->
+  <path
+    class="sigil-stroke"
+    d="M 542 500 Q 570 455 590 470"
+  />
+
+  <!-- DISPATCH VECTORS from center (0.5,0.5) -> (500,500)
+       approximate endpoints:
+         upper-left: (0.421,0.421) -> (421,421)
+         right:      (0.611,0.5)   -> (611,500)
+         down-right: (0.579,0.579)-> (579,579)
+  -->
+  <line
+    class="sigil-stroke"
+    x1="500"
+    y1="500"
+    x2="421"
+    y2="421"
+  />
+  <line
+    class="sigil-stroke"
+    x1="500"
+    y1="500"
+    x2="611"
+    y2="500"
+  />
+  <line
+    class="sigil-stroke"
+    x1="500"
+    y1="500"
+    x2="579"
+    y2="579"
+  />
+
+  <!-- CROSSHAIR SEGMENTS (short, inner only)
+       total length ≈ 85 units in each direction -->
+  <line
+    class="sigil-stroke"
+    x1="500"
+    y1="457.5"
+    x2="500"
+    y2="542.5"
+  />
+  <line
+    class="sigil-stroke"
+    x1="457.5"
+    y1="500"
+    x2="542.5"
+    y2="500"
+  />
+
+  <!-- EYE / AUDIT RING at center
+       diameter ≈ 32 units, r ≈ 16 -->
+  <circle
+    class="sigil-stroke"
+    cx="500"
+    cy="500"
+    r="16"
+  />
+
+  <!-- VAULT TRIANGLE (downward, right side open)
+       left top:  (0.458,0.660) -> (458,660)
+       right top: (0.542,0.660) -> (542,660)
+       bottom:    (0.500,0.733) -> (500,733)
+       We close left + bottom, leave top edge open.
+  -->
+
+  <!-- Left edge (closed) -->
+  <line
+    class="sigil-stroke"
+    x1="458"
+    y1="660"
+    x2="500"
+    y2="733"
+  />
+
+  <!-- Bottom edge (closed) -->
+  <line
+    class="sigil-stroke"
+    x1="500"
+    y1="733"
+    x2="542"
+    y2="660"
+  />
+
+</svg>

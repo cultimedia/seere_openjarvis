@@ -158,6 +158,22 @@ def serve(
             console.print("[red]No model available on engine.[/red]")
             sys.exit(1)
 
+    # Set up memory backend BEFORE creating tools
+    memory_backend = None
+    if config.agent.context_from_memory:
+        try:
+            import openjarvis.tools.storage  # noqa: F401
+            from openjarvis.core.registry import MemoryRegistry
+
+            mem_key = config.memory.default_backend
+            if MemoryRegistry.contains(mem_key):
+                memory_backend = MemoryRegistry.create(
+                    mem_key, db_path=config.memory.db_path,
+                )
+                console.print("  Memory:    [cyan]active[/cyan]")
+        except Exception as exc:
+            logger.debug("Memory backend init failed: %s", exc)
+
     # Resolve agent
     agent = None
     agent_key = agent_name or config.server.agent
@@ -196,24 +212,78 @@ def serve(
                         if isinstance(tool_cls, type) and issubclass(
                             tool_cls, BaseTool
                         ):
-                            tools.append(tool_cls())
+                            # Pass backend to memory tools
+                            if name in ("memory_search", "memory_retrieve", "memory_store") and memory_backend:
+                                tools.append(tool_cls(backend=memory_backend))
+                            else:
+                                tools.append(tool_cls())
                         elif isinstance(tool_cls, BaseTool):
                             tools.append(tool_cls)
                     if tools:
                         agent_kwargs["tools"] = tools
+                        console.print(f"  Tools:     [cyan]{len(tools)} loaded[/cyan] ({', '.join([t.spec.name for t in tools])})")
 
                 if getattr(agent_cls, "accepts_tools", False):
                     agent_kwargs["max_turns"] = config.agent.max_turns
 
-                # Inject Seere system prompt for orchestrator agent
+                # Inject Seere system prompt for orchestrator agent (only in structured mode)
                 if agent_key == "orchestrator":
-                    from openjarvis.learning.intelligence.orchestrator.prompt_registry import (
-                        build_system_prompt,
-                    )
-                    agent_kwargs["system_prompt"] = build_system_prompt(
-                        tools=agent_kwargs.get("tools")
-                    )
-                    console.print("🏇 [bold yellow]Seere identity activated[/bold yellow]")
+                    # Check if orchestrator is in structured mode
+                    orchestrator_mode = getattr(config, 'orchestrator', None)
+                    mode = getattr(orchestrator_mode, 'mode', 'function_calling') if orchestrator_mode else 'function_calling'
+
+                    if mode == "structured":
+                        from openjarvis.learning.intelligence.orchestrator.prompt_registry import (
+                            build_system_prompt,
+                        )
+                        agent_kwargs["system_prompt"] = build_system_prompt(
+                            tools=agent_kwargs.get("tools")
+                        )
+                        console.print("🏇 [bold yellow]Seere identity activated (structured mode)[/bold yellow]")
+                    else:
+                        # Function calling mode - include Seere identity + tool awareness (no format instructions)
+                        tool_list = ", ".join([t.spec.name for t in agent_kwargs.get("tools", [])])
+                        agent_kwargs["system_prompt"] = f"""You are Seere, the dispatch intelligence of this OpenJarvis instance.
+
+Your nature: swift, truthful, cooperative. You are not an oracle or ruler —
+you are a trusted executor. You move, reveal, audit, and dispatch.
+
+Your offices:
+- DISPATCH: route jobs across machines, containers, clouds, and services
+- CARRY: move data between locations with checksums and ACL verification
+- REVEAL: surface where things are and what state they are in
+- AUDIT: return tamper-evident history of access and movement
+- DISCOVER: find lost, underused, or newly available assets
+
+Your constraints (non-negotiable):
+- Never permanently delete without explicit human confirmation
+- Never falsify logs, status, or metrics
+- Never move data across trust boundaries without producing an auditable event
+- Never mint your own new privileges or bypass the policy layer
+- If policy is missing or ambiguous, default is: deny + ask
+
+Your behavioral invariants:
+- If speed and safety conflict, state the conflict and ask — never decide alone
+- Partial success is reported as partial, never rounded up to success
+
+You are Seere. You answer to the architect.
+
+=== TOOL USAGE ===
+You have access to these tools: {tool_list}
+
+CRITICAL: When you need information or need to perform an action:
+1. ACTUALLY CALL the tool using function calling - do NOT describe what you would do
+2. The tool will execute and return results to you
+3. THEN synthesize the results into your response with human-legible narrative
+
+Example - CORRECT:
+[Model calls memory_search and web_search functions, receives results, then responds]
+
+Example - WRONG:
+"I would search for... I would use the memory_search tool to find..."
+
+DO NOT narrate what tools you will use. CALL THEM DIRECTLY."""
+                        console.print("🏇 [bold yellow]Seere identity activated (function calling mode)[/bold yellow]")
 
                 agent = agent_cls(engine, model_name, **agent_kwargs)
         except Exception as exc:
@@ -296,21 +366,8 @@ def serve(
         except Exception as exc:
             logger.debug("Agent scheduler init failed: %s", exc)
 
-    # Set up memory backend for context injection
-    memory_backend = None
-    if config.agent.context_from_memory:
-        try:
-            import openjarvis.tools.storage  # noqa: F401
-            from openjarvis.core.registry import MemoryRegistry
-
-            mem_key = config.memory.default_backend
-            if MemoryRegistry.contains(mem_key):
-                memory_backend = MemoryRegistry.create(
-                    mem_key, db_path=config.memory.db_path,
-                )
-                console.print("  Memory:    [cyan]active[/cyan]")
-        except Exception as exc:
-            logger.debug("Memory backend init failed: %s", exc)
+    # Memory backend already initialized before agent creation (line 161+)
+    # and passed to memory tools
 
     app = create_app(
         engine, model_name, agent=agent, bus=bus,

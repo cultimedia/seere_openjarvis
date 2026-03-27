@@ -222,6 +222,10 @@ class OrchestratorAgent(ToolUsingAgent):
 
         # Get OpenAI-format tool definitions
         openai_tools = self._executor.get_openai_tools() if self._tools else []
+        logger.info(f"🔧 Tools available to agent: {len(openai_tools)}")
+        if openai_tools:
+            tool_names = [t.get('function', {}).get('name', 'unknown') for t in openai_tools]
+            logger.info(f"🔧 Tool names: {tool_names}")
 
         all_tool_results: list[ToolResult] = []
         turns = 0
@@ -248,6 +252,12 @@ class OrchestratorAgent(ToolUsingAgent):
 
             content = result.get("content", "")
             raw_tool_calls = result.get("tool_calls", [])
+
+            logger.info(f"🤖 Model response - tool_calls: {len(raw_tool_calls)}, content length: {len(content)}")
+            if raw_tool_calls:
+                logger.info(f"🤖 Tool calls: {[tc.get('function', {}).get('name') for tc in raw_tool_calls]}")
+            else:
+                logger.info(f"🤖 No tool calls, returning content")
 
             # No tool calls -> check continuation, then final answer
             if not raw_tool_calls:
