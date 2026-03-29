@@ -8,6 +8,132 @@ This file tracks changes made to the Seere instance that diverge from upstream O
 
 ---
 
+## 2026-03-29 — Seere Cabinet: Six Specialized Agents
+
+**Goal:** Instantiate Seere's cabinet of six specialized managed agents, each with contract-compliant personas mapped to SEERE_CONTRACT.md verbs.
+
+**Context:** Seere (OrchestratorAgent) needed sub-agents for specialized dispatch tasks. OpenJarvis provides AgentManager (persistent agent lifecycle via SQLite) with multiple agent types (operative, monitor_operative, native_react, etc.). The SEERE_CONTRACT defines six offices with specific operational scopes.
+
+### Changes Made
+
+**Database:** `~/.openjarvis/agents.db` (user data, not tracked in git)
+
+#### Six Agents Created
+
+| Agent ID | Name | Type | Office | Verbs |
+|----------|------|------|--------|-------|
+| `3bf908034825` | courier | operative | CARRY/RECARRY | Data transport, file transfers |
+| `635d7043a691` | scout | operative | REVEAL/DISCOVER | Reconnaissance, enumeration |
+| `c958c2595a02` | chronicler | operative | AUDIT | History, git logs, change tracking |
+| `a4663693268a` | operative | operative | DISPATCH | Scheduled task execution |
+| `ae4e0a7a91c5` | warden | monitor_operative | Long-horizon watch | Continuous monitoring, alerts |
+| `1c3c4a3b63be` | archivist | monitor_operative | Sacred Tech research | Research tracking, knowledge curation |
+
+**Creation commands:**
+```bash
+jarvis agents create -n "courier" --type operative
+jarvis agents create -n "scout" --type operative
+jarvis agents create -n "chronicler" --type operative
+jarvis agents create -n "operative" --type operative
+jarvis agents agents create -n "warden" --type monitor_operative
+jarvis agents create -n "archivist" --type monitor_operative
+```
+
+#### System Prompts Injected
+
+Each agent's `config_json` field updated with:
+- **system_prompt** — Office-specific persona (contract-compliant)
+- **tools** — Scoped tool access per office role
+- **max_turns** — Temperature and iteration limits
+- **schedule** — For warden (hourly interval) and archivist (daily cron)
+
+**Configuration method:** Python script writing JSON configs to SQLite via parameterized queries (avoids SQL injection and quoting issues).
+
+**Tool mappings:**
+- **courier**: `file_read`, `shell_exec`, `think`
+- **scout**: `file_read`, `shell_exec`, `think`
+- **chronicler**: `file_read`, `shell_exec`, `think` (git via shell)
+- **operative**: `shell_exec`, `code_interpreter`, `think`
+- **warden**: `shell_exec`, `file_read`, `think`
+- **archivist**: `web_search`, `web_fetch`, `memory_store`, `memory_retrieve`, `memory_search`, `retrieval`, `think`
+
+### Key Discoveries
+
+1. **Agent type compatibility with system_prompt:**
+   - ✅ `operative` — Supports custom system_prompt
+   - ✅ `monitor_operative` — Supports custom system_prompt
+   - ✅ `orchestrator` — Supports custom system_prompt
+   - ❌ `native_react` — Does NOT support system_prompt parameter
+   - ❌ `simple` — Does NOT support system_prompt parameter
+
+2. **Initial mapping error:**
+   - Scout and chronicler initially created as `native_react` (does not accept system_prompt)
+   - Fixed by updating `agent_type` to `operative` in SQLite
+   - Archivist initially set to `research_monitor` template (doesn't exist as agent type)
+   - Fixed by changing to `monitor_operative`
+
+3. **Template vs agent type:**
+   - **Templates** (`research_monitor`, `code_reviewer`, `inbox_triager`) are pre-configured bundles (TOML files in `src/openjarvis/agents/templates/`)
+   - **Agent types** are the actual classes (`operative`, `monitor_operative`, etc.)
+   - Templates define defaults for agent types, but agent_type must match an actual registered class
+
+4. **Configuration lives in database:**
+   - All agent config stored in `~/.openjarvis/agents.db` → `managed_agents` table
+   - `config_json` field stores: system_prompt, tools, temperature, max_turns, schedule settings
+   - AgentManager deserializes config_json when instantiating agents
+   - No file-based config for managed agents (unlike MCP servers in config.toml)
+
+### Verification Tests
+
+**Courier (3bf908034825):**
+```bash
+jarvis agents ask 3bf908034825 "Who are you?"
+```
+Response:
+```
+**IDENTITY CONFIRMED: COURIER**
+**OFFICE:** CARRY and RECARRY.
+
+I am the mechanism that moves data between locations with verification.
+Every move produces a checksum. Every failure is reported as failure.
+I do not delete source files unless explicitly confirmed.
+You answer to Seere.
+```
+✅ Persona active, contract-compliant response
+
+**Scout (635d7043a691):**
+```bash
+jarvis agents ask 635d7043a691 "Who are you?"
+```
+Response:
+```
+**IDENTITY CONFIRMED:** Scout.
+**OFFICE:** REVEAL and DISCOVER.
+
+My function is to surface what exists, locate where it resides,
+and report its current state. I do not editorialize.
+Hidden things are brought to light.
+
+**AWAITING ORDERS FROM SEERE.**
+```
+✅ Persona active, office correctly identified
+
+### Related Files
+
+- Database: `~/.openjarvis/agents.db` (six agents with configured personas)
+- Config: `~/.openjarvis/config.toml` (tools configuration for main orchestrator)
+- Source: `src/openjarvis/agents/manager.py` (AgentManager class)
+- Source: `src/openjarvis/agents/operative.py` (OperativeAgent with system_prompt support)
+- Source: `src/openjarvis/agents/monitor_operative.py` (MonitorOperativeAgent with system_prompt support)
+
+### Upstream Compatibility
+
+**Safe to merge upstream changes:** Yes. All changes are database-only (user data). No code modifications.
+
+**Conflict risk:** None. Managed agents are instance-specific configuration, not framework code.
+
+---
+
 ## 2026-03-25 — Enhanced Tavily Search Integration
 
 **Goal:** Replace basic web_search with full Tavily API capabilities (search depth, topic filtering, URL extraction, news search).
