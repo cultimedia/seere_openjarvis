@@ -65,6 +65,25 @@ curl -s http://localhost:5173 | grep -q "<!doctype html" && echo "Frontend OK"
 
 All three should respond successfully.
 
+### Agent Scheduler Status
+
+When Seere backend starts, look for this line in Terminal 2:
+```
+  Scheduler: active
+```
+
+This confirms **warden** (OMMA compliance monitoring) is automatically running:
+- Polls keith@legacycult.com and compliance@legacycult.com every 30 minutes
+- Fires macOS notifications for CRITICAL alerts (@omma.ok.gov senders)
+- Logs all findings to Seere memory with severity tags
+- No manual intervention required — runs automatically when backend is active
+
+**Verify warden status:**
+```bash
+jarvis agents status | grep warden
+# Should show: warden   idle   every 1800s   ...
+```
+
 ---
 
 ## Persona Verification

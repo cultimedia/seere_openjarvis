@@ -8,6 +8,149 @@ This file tracks changes made to the Seere instance that diverge from upstream O
 
 ---
 
+## 2026-03-30 — Warden: OMMA Compliance Email Monitoring
+
+**Goal:** Configure warden agent to monitor two Gmail accounts for Oklahoma Medical Marijuana Authority (OMMA) compliance emails and fire immediate alerts for inspection notices.
+
+**Context:** Legacy Cultivation Co (OMMA License GAAI-NKK7-HVWB) needs continuous surveillance for regulatory correspondence. OpenJarvis provides EmailChannel (stdlib IMAP/SMTP) and channel_bindings system for connecting agents to messaging channels. Warden (monitor_operative) was configured to poll both compliance email accounts every 30 minutes.
+
+### Changes Made
+
+**Database:** `~/.openjarvis/agents.db` → `channel_bindings` and `managed_agents` tables (user data, not tracked in git)
+
+#### Email Channel Bindings Created
+
+Two email accounts bound to warden agent (`ae4e0a7a91c5`):
+
+| Binding ID | Email | Configuration |
+|------------|-------|---------------|
+| `a4aea1be56d2` | keith@legacycult.com | IMAP: imap.gmail.com:993, SMTP: smtp.gmail.com:587 |
+| `47fb2983ebd2` | compliance@legacycult.com | IMAP: imap.gmail.com:993, SMTP: smtp.gmail.com:587 |
+
+**Binding configuration:**
+- `channel_type`: `"email"`
+- `routing_mode`: `"dedicated"` (warden exclusively monitors these accounts)
+- `poll_interval`: 1800 seconds (30 minutes)
+- `watch_folders`: `["INBOX"]`
+- Authentication: Gmail app-specific password (stored in config_json)
+
+**Creation method:**
+```python
+# Python script to insert channel_bindings via parameterized queries
+# Credentials passed via stdin to avoid shell history exposure
+# Uses secrets.token_hex() for binding/session IDs
+```
+
+#### Warden System Prompt Updated
+
+Enhanced warden's system prompt with OMMA-specific monitoring instructions:
+
+**Facility Details:**
+- Name: Legacy Cultivation Co
+- License: GAAI-NKK7-HVWB (also appears as GAAA-NKK7-HVWB)
+- Address: 4912 SE 3rd Ave, Durant, OK 74701
+
+**Known OMMA Inspectors:**
+- Josh Rorex (Josh.Rorex@omma.ok.gov) — Compliance Inspector
+- Darrell Dorsett (Darrell.Dorsett@omma.ok.gov) — Compliance Inspector
+- Tresa Collier, Andrea Lashley — frequently CC'd
+
+**Alert Level Definitions:**
+
+**CRITICAL** — Immediate macOS notification via osascript:
+- Any sender from `@omma.ok.gov`
+- Subject contains: "notice of inspection", "inspection", "site visit", "operational status visit"
+- Body contains license numbers GAAI-NKK7-HVWB or GAAA-NKK7-HVWB
+- Any mention of inspection date/time window
+
+**HIGH** — Log to digest with HIGH tag:
+- "deficiency", "corrective action", "violation", "administrative penalty"
+- "nonrenewal", "suspension", "revocation", "complaint filed"
+
+**MEDIUM** — Log to digest with MEDIUM tag:
+- "license renewal", "license expiration", "annual report", "compliance deadline"
+- Any email from Alex Chen regarding facility status
+
+**Operational Constraints:**
+- Observe only — do not reply, do not delete, do not mark as read
+- CRITICAL findings fire osascript notification immediately
+- All findings appended to daily digest in Seere memory
+- Gaps in email access reported as gaps, not silently skipped
+- If no compliance email found in 72 hours, log clean status confirmation
+
+**Schedule Configuration:**
+- `schedule_type`: `"interval"`
+- `schedule_value`: `"1800"` (30 minutes)
+- `temperature`: `0.1` (low variance for precise pattern matching)
+- `max_turns`: `10`
+- `tools`: `["shell_exec", "file_read", "memory_store", "memory_search", "think"]`
+
+### Verification Tests
+
+**First scan completed successfully:**
+```
+Running tick for "warden"...
+Tick complete. Status: idle, runs: 1
+```
+
+**Warden's initial report:**
+- Scanned both email accounts (keith@legacycult.com, compliance@legacycult.com)
+- No OMMA compliance alerts detected (CRITICAL, HIGH, MEDIUM all clean)
+- Logged clean status confirmation to agent memory
+- Verified continuous email access (no gaps)
+- Status: Idle, ready for next scheduled scan
+
+**Scheduler integration verified:**
+- Backend restart shows `Scheduler: active`
+- Warden automatically registered with AgentScheduler
+- Monitoring active every 30 minutes
+- No manual intervention required on Seere startup
+
+### Key Discoveries
+
+1. **EmailChannel Implementation:**
+   - Built-in channel type in `src/openjarvis/channels/email_channel.py`
+   - Uses stdlib only (smtplib, imaplib) — no extra dependencies
+   - Polls IMAP INBOX for UNSEEN messages every 30 seconds within the agent's tick
+   - Supports STARTTLS (SMTP 587) and SSL (IMAP 993)
+
+2. **Channel Bindings Pattern:**
+   - Stored in `channel_bindings` table with agent_id reference
+   - Config stored as JSON in `config_json` field
+   - CLI command `jarvis agents bind` only supports Slack/Telegram/WhatsApp
+   - Email binding requires manual database insertion
+
+3. **Password Security Issue (Upstream):**
+   - `jarvis agents channels` CLI command displays passwords in plaintext
+   - Safe alternative: SQL queries with specific field selection
+   - Passwords must be stored (required for IMAP authentication)
+   - Recommendation: Use SQL queries to verify bindings without exposing credentials
+
+4. **AgentScheduler Behavior:**
+   - `jarvis serve` auto-registers agents with `schedule_type` in ("cron", "interval")
+   - Agents with status "archived" or "error" are skipped
+   - CLI command `jarvis agents start` registers with temporary scheduler instance
+   - Backend restart required after initial channel binding to activate automatic monitoring
+   - Once registered, warden runs automatically whenever `jarvis serve` is active
+
+### Related Files
+
+- Channel implementation: `src/openjarvis/channels/email_channel.py`
+- CLI channel commands: `src/openjarvis/cli/channel_cmd.py`
+- Agent scheduler: `src/openjarvis/agents/scheduler.py`
+- Agent CLI: `src/openjarvis/cli/agent_cmd.py`
+- Database: `~/.openjarvis/agents.db` (channel_bindings, managed_agents tables)
+
+### Upstream Compatibility
+
+**Safe to merge upstream changes:** Yes. All changes are database-only (user data). No code modifications.
+
+**Security consideration:** The password display issue in `jarvis agents channels` is an upstream CLI formatting issue. Consider contributing a PR to redact sensitive fields in config_json output.
+
+**Conflict risk:** None. Email monitoring is instance-specific configuration.
+
+---
+
 ## 2026-03-29 — Seere Cabinet: Six Specialized Agents
 
 **Goal:** Instantiate Seere's cabinet of six specialized managed agents, each with contract-compliant personas mapped to SEERE_CONTRACT.md verbs.
