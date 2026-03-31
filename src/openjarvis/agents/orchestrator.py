@@ -255,7 +255,7 @@ class OrchestratorAgent(ToolUsingAgent):
 
             logger.info(f"🤖 Model response - tool_calls: {len(raw_tool_calls)}, content length: {len(content)}")
             if raw_tool_calls:
-                logger.info(f"🤖 Tool calls: {[tc.get('function', {}).get('name') for tc in raw_tool_calls]}")
+                logger.info(f"🤖 Tool calls: {[tc.get('name') for tc in raw_tool_calls]}")
             else:
                 logger.info(f"🤖 No tool calls, returning content")
 

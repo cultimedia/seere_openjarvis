@@ -52,6 +52,55 @@ class _OpenAICompatibleEngine(InferenceEngine):
                         pass
         return msg_dicts
 
+    @staticmethod
+    def _merge_system_messages(msg_dicts: list) -> list:
+        """Merge multiple system messages into one.
+
+        Some OpenAI-compatible servers (like MLX) don't accept multiple
+        system messages and return 404. This merges them into a single
+        system message at the beginning.
+        """
+        system_messages = []
+        other_messages = []
+
+        for msg in msg_dicts:
+            if msg.get("role") == "system":
+                system_messages.append(msg.get("content", ""))
+            else:
+                other_messages.append(msg)
+
+        if len(system_messages) <= 1:
+            return msg_dicts
+
+        # Merge all system messages
+        merged_content = "\n\n---\n\n".join(system_messages)
+        merged_msg = {"role": "system", "content": merged_content}
+
+        return [merged_msg] + other_messages
+
+    @staticmethod
+    def _convert_tool_messages(msg_dicts: list) -> list:
+        """Convert tool role messages to user messages.
+
+        Some OpenAI-compatible servers (like MLX) don't support role="tool"
+        and return 404. This converts them to user messages with the tool
+        result formatted as text.
+        """
+        converted = []
+        for msg in msg_dicts:
+            if msg.get("role") == "tool":
+                # Convert tool message to user message
+                tool_name = msg.get("name", "unknown_tool")
+                content = msg.get("content", "")
+                user_msg = {
+                    "role": "user",
+                    "content": f"Tool Result from {tool_name}:\n{content}"
+                }
+                converted.append(user_msg)
+            else:
+                converted.append(msg)
+        return converted
+
     def generate(
         self,
         messages: Sequence[Message],
@@ -62,6 +111,8 @@ class _OpenAICompatibleEngine(InferenceEngine):
         **kwargs: Any,
     ) -> Dict[str, Any]:
         msg_dicts = self._fix_tool_call_arguments(messages_to_dicts(messages))
+        msg_dicts = self._merge_system_messages(msg_dicts)
+        msg_dicts = self._convert_tool_messages(msg_dicts)
         payload: Dict[str, Any] = {
             "model": model,
             "messages": msg_dicts,
