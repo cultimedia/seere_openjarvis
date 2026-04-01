@@ -113,9 +113,25 @@ class _OpenAICompatibleEngine(InferenceEngine):
             if msg.get("role") == "assistant" and msg.get("tool_calls"):
                 content = msg.get("content")
                 if not content or (isinstance(content, str) and not content.strip()):
-                    logger.info("🔧 Fixing empty content in assistant message with tool_calls")
                     msg["content"] = "Calling tools..."
         return msg_dicts
+
+    @staticmethod
+    def _strip_tool_calls_from_history(msg_dicts: list) -> list:
+        """Strip tool_calls from assistant messages in conversation history.
+
+        Some OpenAI-compatible servers (like MLX) reject assistant messages
+        with tool_calls present in conversation history after those calls have
+        been executed and results provided. This removes the tool_calls field
+        from assistant messages while preserving the content.
+        """
+        cleaned = []
+        for msg in msg_dicts:
+            if msg.get("role") == "assistant" and "tool_calls" in msg:
+                # Keep the message but remove tool_calls field
+                msg = {k: v for k, v in msg.items() if k != "tool_calls"}
+            cleaned.append(msg)
+        return cleaned
 
     def generate(
         self,
@@ -130,14 +146,7 @@ class _OpenAICompatibleEngine(InferenceEngine):
         msg_dicts = self._merge_system_messages(msg_dicts)
         msg_dicts = self._convert_tool_messages(msg_dicts)
         msg_dicts = self._ensure_content_in_tool_calls(msg_dicts)
-
-        # Debug logging for MLX issues
-        if len(msg_dicts) > 2:
-            roles = [m.get("role") for m in msg_dicts]
-            logger.info(f"🔍 Sending {len(msg_dicts)} messages to {self.engine_id}: roles={roles}")
-            for i, m in enumerate(msg_dicts):
-                tc = m.get("tool_calls", [])
-                logger.info(f"  [{i}] role={m.get('role')}, has_tool_calls={len(tc)>0}, content_len={len(str(m.get('content', '')))}")
+        msg_dicts = self._strip_tool_calls_from_history(msg_dicts)
 
         payload: Dict[str, Any] = {
             "model": model,
