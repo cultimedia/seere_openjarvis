@@ -2,13 +2,14 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Send, Square, Paperclip } from 'lucide-react';
 import { useAppStore, generateId } from '../../lib/store';
 import { streamChat } from '../../lib/sse';
-import { fetchSavings } from '../../lib/api';
+import { fetchSavings, fetchChatTools } from '../../lib/api';
 import { MicButton } from './MicButton';
 import { useSpeech } from '../../hooks/useSpeech';
 import type { ChatMessage, ToolCallInfo, TokenUsage, MessageTelemetry } from '../../types';
 
 export function InputArea() {
   const [input, setInput] = useState('');
+  const [tools, setTools] = useState<any[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -42,6 +43,11 @@ export function InputArea() {
     }
     prevModelRef.current = selectedModel;
   }, [selectedModel, streamState.isStreaming, resetStream]);
+
+  // Fetch available tools on mount
+  useEffect(() => {
+    fetchChatTools().then(setTools).catch(() => setTools([]));
+  }, []);
 
   const micDisabled = !speechEnabled || !speechAvailable || streamState.isStreaming;
   const micReason: 'not-enabled' | 'no-backend' | 'streaming' | undefined =
@@ -147,7 +153,7 @@ export function InputArea() {
 
     try {
       for await (const sseEvent of streamChat(
-        { model: selectedModel, messages: apiMessages, stream: true },
+        { model: selectedModel, messages: apiMessages, stream: true, tools },
         controller.signal,
       )) {
         const eventName = sseEvent.event;

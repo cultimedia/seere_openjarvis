@@ -5,6 +5,7 @@ export interface ChatRequest {
   model: string;
   messages: Array<{ role: string; content: string }>;
   stream: true;
+  tools?: Array<any>;
 }
 
 export async function* streamChat(

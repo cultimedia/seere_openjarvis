@@ -524,6 +524,13 @@ export async function fetchAvailableTools(): Promise<ToolInfo[]> {
   return data.tools || [];
 }
 
+export async function fetchChatTools(): Promise<any[]> {
+  const res = await fetch(`${getBase()}/v1/tools`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.tools || [];
+}
+
 export async function saveToolCredentials(
   toolName: string,
   credentials: Record<string, string>,
