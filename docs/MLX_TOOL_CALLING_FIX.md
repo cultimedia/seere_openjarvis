@@ -118,23 +118,40 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 
 ## Current Status
 
-✅ **Fixed:** Multiple system messages
-✅ **Fixed:** Tool message format conversion
-✅ **Partially Working:** First request succeeds, model generates tool calls
-⚠️ **In Progress:** Second request (with converted tool messages) still returns 404
+✅ **FULLY WORKING** - Tool calling now works end-to-end with MLX!
 
-## Next Steps
+### All Issues Resolved:
 
-1. Investigate why the second request (with tool results) still fails
-2. Possible causes:
-   - Assistant message with empty content but tool_calls may not be supported
-   - Converted tool message format may need adjustment
-   - MLX may have additional restrictions on message ordering
+1. **✅ Multiple system messages** - Fixed with `_merge_system_messages()`
+2. **✅ Unsupported `role="tool"`** - Fixed with `_convert_tool_messages()`
+3. **✅ Empty content with tool_calls** - Fixed with `_ensure_content_in_tool_calls()`
+4. **✅ Tool_calls in history** - Fixed with `_strip_tool_calls_from_history()`
 
-3. Workaround considerations:
-   - Disable tool calling for MLX temporarily
-   - Use a different model/engine for tool-heavy tasks
-   - Further refine message format conversion
+### Verified Working:
+
+```bash
+# Test query: "What happened in AI news today? Search for it."
+# Result: 200 OK with actual AI news content from Tavily
+
+# MLX Server Logs:
+# First request: 200 OK (model generates tool_calls)
+# Tool execution: news_search runs via Tavily API
+# Second request: 200 OK (model synthesizes results into answer)
+```
+
+### Commits:
+
+- `900ac6d` - Merge system messages + convert tool role
+- `9c418a5` - Ensure content in tool_calls
+- `986b4f8` - Strip tool_calls from history (FINAL FIX)
+
+### The Final Issue & Solution:
+
+**Problem:** MLX was rejecting the second request (with tool results) with 404.
+
+**Root Cause:** Assistant messages in conversation history still contained the `tool_calls` field after tools had been executed. MLX rejects assistant messages with `tool_calls` in history after those calls are complete. Ollama accepts this format; MLX is stricter.
+
+**Solution:** Strip `tool_calls` field from assistant messages before sending to MLX, while preserving the content. This allows MLX to see the conversation flow without the now-executed tool call metadata.
 
 ## MLX Server Details
 
