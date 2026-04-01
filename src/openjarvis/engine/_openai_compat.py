@@ -101,6 +101,22 @@ class _OpenAICompatibleEngine(InferenceEngine):
                 converted.append(msg)
         return converted
 
+    @staticmethod
+    def _ensure_content_in_tool_calls(msg_dicts: list) -> list:
+        """Ensure assistant messages with tool_calls have non-empty content.
+
+        Some OpenAI-compatible servers (like MLX) return 404 when an assistant
+        message has tool_calls but empty/null content. This ensures content is
+        always present, using a placeholder if necessary.
+        """
+        for msg in msg_dicts:
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                content = msg.get("content")
+                if not content or (isinstance(content, str) and not content.strip()):
+                    logger.info("🔧 Fixing empty content in assistant message with tool_calls")
+                    msg["content"] = "Calling tools..."
+        return msg_dicts
+
     def generate(
         self,
         messages: Sequence[Message],
@@ -113,6 +129,16 @@ class _OpenAICompatibleEngine(InferenceEngine):
         msg_dicts = self._fix_tool_call_arguments(messages_to_dicts(messages))
         msg_dicts = self._merge_system_messages(msg_dicts)
         msg_dicts = self._convert_tool_messages(msg_dicts)
+        msg_dicts = self._ensure_content_in_tool_calls(msg_dicts)
+
+        # Debug logging for MLX issues
+        if len(msg_dicts) > 2:
+            roles = [m.get("role") for m in msg_dicts]
+            logger.info(f"🔍 Sending {len(msg_dicts)} messages to {self.engine_id}: roles={roles}")
+            for i, m in enumerate(msg_dicts):
+                tc = m.get("tool_calls", [])
+                logger.info(f"  [{i}] role={m.get('role')}, has_tool_calls={len(tc)>0}, content_len={len(str(m.get('content', '')))}")
+
         payload: Dict[str, Any] = {
             "model": model,
             "messages": msg_dicts,
