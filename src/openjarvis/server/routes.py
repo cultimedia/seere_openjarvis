@@ -468,19 +468,18 @@ async def server_info(request: Request):
 async def list_tools(request: Request):
     """Return available tools in OpenAI function-calling format."""
     agent = getattr(request.app.state, "agent", None)
-    if agent is None or not hasattr(agent, "_tool_executor"):
+    if agent is None or not hasattr(agent, "_executor"):
         return {"tools": []}
 
-    tool_executor = agent._tool_executor
-    if tool_executor is None or not hasattr(tool_executor, "_tools"):
+    executor = agent._executor
+    if executor is None:
         return {"tools": []}
 
-    tools = []
-    for tool in tool_executor._tools.values():
-        try:
-            tools.append(tool.to_openai_function())
-        except Exception:
-            continue
+    # Use the executor's get_openai_tools method
+    try:
+        tools = executor.get_openai_tools() if hasattr(executor, "get_openai_tools") else []
+    except Exception:
+        tools = []
 
     return {"tools": tools}
 
